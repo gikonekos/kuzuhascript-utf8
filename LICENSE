@@ -1,0 +1,81 @@
+== English ==
+
+The code in this repository is a modified derivative of "kuzuhascript Rev.0.1
+Preview 9", originally published in 2000 by kuzuha (くずは). The original work
+and the modifications are licensed differently, so they are listed separately
+below. For details on the original work and the changes made, see NOTICE.md
+and doc/changelog.md.
+
+--------------------------------------------------------------------------------
+
+Original Work
+
+Copyright (c) 2000 kuzuha (くずは). All rights reserved.
+
+No explicit license terms were found for the original work at the time of its
+publication. Copyright belongs to the original author.
+
+--------------------------------------------------------------------------------
+
+Modifications
+
+The MIT License below applies to the modifications made to the original work
+in this repository (character encoding conversion, vulnerability fixes, bug
+fixes, etc. — see doc/changelog.md for details).
+
+MIT License
+
+Copyright (c) 2026 AWAMOMO OFFICE (基建吉)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+See also SECURITY.md for important notes on the security posture of this
+software before deploying it anywhere.
+
+== 日本語 ==
+
+このリポジトリのコードは、2000年にkuzuha(くずは)氏が公開した「くずはすくりぷと
+Rev.0.1 Preview 9」を原型とする改造版です。原著作物と改変部分とでライセンスの
+扱いが異なるため、以下に分けて記載します。詳細な原本情報および改変内容は
+NOTICE.md および doc/changelog.md を参照してください。
+
+--------------------------------------------------------------------------------
+
+原著作物 (Original Work)
+
+Copyright (c) 2000 kuzuha (くずは). All rights reserved.
+
+原著作物について、公開時に明示的なライセンス条項は確認されていません。
+著作権は原著作者に帰属します。
+
+--------------------------------------------------------------------------------
+
+改変部分 (Modifications)
+
+以下のMITライセンスは、原著作物に対して本リポジトリで加えられた改変部分
+（文字コード変換、脆弱性対策、バグ修正等。詳細はdoc/changelog.md参照）に
+適用されます。
+
+MIT License
+
+Copyright (c) 2026 AWAMOMO OFFICE (基建吉)
+
+上記英文のMIT Licenseと同一条項です（日本語訳は省略）。
+
+配置・運用の際のセキュリティ上の注意点については、必ずSECURITY.mdも
+あわせてご確認ください。

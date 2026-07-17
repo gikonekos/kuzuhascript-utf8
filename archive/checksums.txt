@@ -1,0 +1,11 @@
+archive/ 内ファイルのSHA256チェックサム
+無改変であることの証明用。検証: sha256sum -c checksums.txt
+
+542811a4c332f7d887660fdd9fe71bc806eac4291efc9689e43de385d7c6f4c1  kuzuhascript01.zip
+98dc05c95b3ea5b948002746d51a19f544ab4f1cb63493077496ce77fa08c4c5  kuzuhascript02.zip
+
+# 以下はkuzuhascript02.zip内 arc2/ に格納されている原本アーカイブ
+# （くずは氏配布物そのもの）のチェックサム。参考情報のため
+# sha256sum -c では直接検証されない。
+b4e3c9bdd7395cd6cb334fd42ca83ac0939edbf678e2241d8cd08fc4a4d9503d  kscrr1p9.lzh (in kuzuhascript02.zip:arc2/)
+a849071b2e5f42d02a5b5b7b9c8146c93a9d9470f22b1233d815c63e56f62143  kscrr1p9up.lzh (in kuzuhascript02.zip:arc2/)
