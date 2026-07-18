@@ -1,0 +1,233 @@
+# CGI（bbs.cgi）動作確認・導入 ChangeLog
+
+記録形式：ISO 8601（分単位、UTC）。実際のApacheログ
+（access.log／error.log、client ***.***.***.*** のセッションのみ）に
+基づく。攻撃・スキャン由来のノイズ（`/cgi-bin/../../bin/sh`等の
+シバン悪用スキャン、`xmlrpc.php`スキャン等）は本記録の対象外として
+除外している。
+目的：Oracle Cloud上のUbuntu VPSで bbs.cgi がCGIとして実行されず、
+　　　Perlソースコードがそのままブラウザに表示される問題の解決記録。
+方針：CGI本体のロジックには一切手を入れず、サーバー環境側を整備して
+　　　オリジナルのCGIがそのまま動作する状態を再現する（動態保存の観点）。
+
+※ログに残っているのは「いつ・何が起きたか」（アクセス結果・
+エラー・Apache再起動）であり、各再起動の間に具体的に何を変更したか
+（シバンかCRLFか権限か等）はログ単体からは特定できない。対応する
+具体的な修正内容はrealfight.txt（基さんの作業記録）に基づくもので
+あり、以下の各エントリでは「ログで確認できる事実」と「realfight.txt
+に基づく対応内容」を明確に分けて記載する。
+
+## 時系列 ChangeLog
+
+------------------------------------------------------------
+2026-07-18T04:54 UTC
+------------------------------------------------------------
+【ログ事実】`GET /cgi-bin/bbs.cgi` → HTTP 200。
+【状況】CGIとして実行されず、Perlソースコードがそのまま表示されて
+いた（symptom）。HTTPステータス自体は200だが、これはCGIとして
+実行された結果ではなく、静的ファイルとしてテキスト配信された
+ことによるものと考えられる。
+
+------------------------------------------------------------
+2026-07-18T05:13 UTC
+------------------------------------------------------------
+【ログ事実】Apache設定のグレースフル再起動（1回目、
+`AH00163: Apache/2.4.58 (Ubuntu) ... resuming normal operations`）。
+【備考】このログにより、稼働環境がApache/2.4.58（Ubuntu）である
+ことが確認できる。
+
+------------------------------------------------------------
+2026-07-18T05:14 UTC
+------------------------------------------------------------
+【ログ事実】`GET /cgi-bin/bbs.cgi` → HTTP 404。
+`AH01264: script not found or unable to stat: /usr/lib/cgi-bin/bbs.cgi`
+【判明】Apacheが参照していたCGI実行パスは `/usr/lib/cgi-bin/`
+（Ubuntu apache2のデフォルトScriptAlias）であり、実際に
+bbs.cgiが置かれていた `/var/www/html/cgi-bin/` とは異なっていた。
+【対応（realfight.txt）】ScriptAliasを`/var/www/html/cgi-bin/`に
+向ける設定を追加。
+
+------------------------------------------------------------
+2026-07-18T05:22 UTC
+------------------------------------------------------------
+【ログ事実】設定リロード（2回目）の直後、
+`GET /cgi-bin/bbs.cgi` → HTTP 500。
+`AH01241: exec of '/var/www/html/cgi-bin/bbs.cgi' failed
+(No such file or directory)`、
+`End of script output before headers: bbs.cgi`
+【判明】ScriptAliasのパスは解決されたが、bbs.cgi自体の実行
+（exec）に失敗するようになった。exec失敗時の典型的な原因である
+インタプリタパス（シバン）の不一致が疑われる。
+【対応（realfight.txt）】シバンを`#!/usr/local/bin/perl`から
+`#!/usr/bin/perl`へ修正。
+
+------------------------------------------------------------
+2026-07-18T05:25 UTC
+------------------------------------------------------------
+【ログ事実】設定リロード（3回目）の直後も
+`GET /cgi-bin/bbs.cgi` → HTTP 500 が2回連続（`AH01241`、
+`End of script output before headers`）。
+【判明】シバンパスの修正のみでは解決しなかった。
+【対応（realfight.txt）】シバン行の改行コードをCRLF（Windows）
+からLF（Unix）へ変換。
+
+------------------------------------------------------------
+2026-07-18T05:29 UTC
+------------------------------------------------------------
+【ログ事実】設定リロード（4回目）の直後も
+`GET /cgi-bin/bbs.cgi` → HTTP 500 が3回連続（同じく`AH01241`、
+`End of script output before headers`）。
+【判明】CRLF修正後もなお解決していなかった。
+【対応（realfight.txt）】コマンドラインおよびwww-dataユーザーでの
+直接実行による切り分け、cgi-bin・countディレクトリの書き込み権限
+（777）への変更。
+
+------------------------------------------------------------
+2026-07-18T05:35 UTC
+------------------------------------------------------------
+【ログ事実】設定リロード（5回目）の直後、
+`GET /cgi-bin/bbs.cgi` → HTTP 200（初回成功）。
+【判明】この時点までの一連の対応（ScriptAlias・シバンパス・CRLF・
+パーミッション）が揃ったことで、CGIとして正常に実行されるように
+なった。
+
+------------------------------------------------------------
+2026-07-18T05:39〜05:40 UTC
+------------------------------------------------------------
+【ログ事実】`AH00170: caught SIGWINCH, shutting down gracefully`
+の後、新しいマスタープロセス（pid 1048）で
+`AH00163: Apache/2.4.58 (Ubuntu) ... resuming normal operations`。
+【状況】グレースフルリロードではなく、Apacheプロセス自体が
+再起動している（サービス再起動相当）。
+
+------------------------------------------------------------
+2026-07-18T05:54 UTC
+------------------------------------------------------------
+【ログ事実】`GET /cgi-bin/bbs.cgi` → HTTP 500（一時的な再発）。
+`AH01241: exec of '/var/www/html/cgi-bin/bbs.cgi' failed`
+【判明】05:35時点で一度成功していたにもかかわらず、05:40の
+Apache再起動後に一時的に500が再発した。realfight.txtの
+「cgi-bin・countディレクトリの権限変更」が本再起動を挟んで
+再度必要になった可能性があるが、ログ単体からは断定できない
+（失敗も成果として記録）。
+
+------------------------------------------------------------
+2026-07-18T05:55 UTC
+------------------------------------------------------------
+【ログ事実】`GET /cgi-bin/bbs.cgi` → HTTP 200（復帰）。
+
+------------------------------------------------------------
+2026-07-18T05:59 UTC
+------------------------------------------------------------
+【ログ事実】`POST /cgi-bin/bbs.cgi` → HTTP 200。
+【状況】投稿（カウンタ・書き込み機能を伴う操作）のテストと
+考えられる。
+
+------------------------------------------------------------
+2026-07-18T06:01〜06:13 UTC
+------------------------------------------------------------
+【ログ事実】`GET /cgi-bin/bbs.cgi` → HTTP 200 が計7回
+（06:01, 06:02, 06:03, 06:07×2, 06:11, 06:13）。
+【判明】以後500エラーの再発は無く、安定して動作していることを
+確認できる。掲示板トップページ・カウンタ機能の最終確認に対応する
+と考えられる。
+
+## 最終総括
+
+【判明した原因】
+- Apache（Ubuntu apache2）のデフォルトCGIエイリアスパス
+  （`/usr/lib/cgi-bin/`）と、実際にbbs.cgiを配置したパス
+  （`/var/www/html/cgi-bin/`）が一致していなかった（AH01264, 404）。
+- シバン行のパス不一致、およびCRLF残存により、exec自体が失敗して
+  いた（AH01241, 500）。
+- cgi-bin・countディレクトリの書き込み権限不足により、初期データの
+  生成・更新が失敗していた（05:54の一時的再発を含む）。
+
+【採用した方針（動態保存の観点）】
+掲示板としての動作ロジックには変更を加えず、Apache設定
+（ScriptAlias等）・シバン・パーミッションというサーバー環境側の
+整備を中心に、オリジナルのCGIを動作させる状態を再現した。ただし
+下記【現状維持している暫定対応】の通り、ディレクトリ解決に関する
+1点のみ、コード側の暫定対応（chdir）が現時点でも必要な状態が
+残っている。
+
+【現状維持している暫定対応（未解決・要検討）】
+調査中に「実行時のカレントディレクトリがズレているのでは」という
+仮説を確かめるために追加した以下のコードは、現時点で**削除すると
+CGIが動作しなくなる**ため、暫定的にそのまま残している。
+
+```perl
+use Cwd 'abs_path';
+use File::Basename;
+chdir dirname(abs_path($0));
+```
+
+つまり、この1点に関しては「サーバー環境側の整備だけで、コードを
+一切変更せずに動作させる」という動態保存の理想形にはまだ届いて
+いない。実行時のディレクトリ解決を完全にサーバー側（Apache設定等）
+だけで解決する方法は今後の課題として残っている。
+
+## 作業統計
+
+- 検証項目：CGIエイリアスパス／Perl実行パス（シバン）／CRLF／
+  パーミッション／カウンタ機能（計5項目）
+- ログで確認できた再起動回数：5回（グレースフルリロード×4、
+  プロセス再起動×1）
+- ログで確認できたbbs.cgiへのリクエスト結果：
+  200（成功）11回、500（exec失敗）8回、404（パス不一致）1回
+- 障害発生から安定動作確認までの所要時間（ログ基準）：
+  約1時間19分（04:54 UTC 初回アクセス 〜 06:13 UTC 最終確認）
+- 対象ファイル：bbs.cgi、count（ディレクトリ）、Apache設定
+  （apache2系、`/usr/sbin/apache2`、Apache/2.4.58 Ubuntu）
+
+## Appendix
+
+### Appendix A：実ログ抜粋（access.log／error.log、攻撃ノイズ除外済み）
+
+```
+[Sat Jul 18 05:13:33.909258 2026] [mpm_prefork:notice] AH00170: caught SIGWINCH, shutting down gracefully
+[Sat Jul 18 05:13:34.303896 2026] [mpm_prefork:notice] AH00163: Apache/2.4.58 (Ubuntu) OpenSSL/3.0.13 configured -- resuming normal operations
+[Sat Jul 18 05:14:16.649847 2026] [cgid:error] [client ***.***.***.***] AH01264: script not found or unable to stat: /usr/lib/cgi-bin/bbs.cgi
+***.***.***.*** - - [18/Jul/2026:05:14:16 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 404
+
+[Sat Jul 18 05:22:42.341871 2026] [mpm_prefork:notice] AH00171: Graceful restart requested, doing restart
+[Sat Jul 18 05:22:52.931760 2026] [cgid:error] (2)No such file or directory: AH01241: exec of '/var/www/html/cgi-bin/bbs.cgi' failed
+[Sat Jul 18 05:22:52.932615 2026] [cgid:error] [client ***.***.***.***] End of script output before headers: bbs.cgi
+***.***.***.*** - - [18/Jul/2026:05:22:52 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 500
+
+[Sat Jul 18 05:29:18.641770 2026] [mpm_prefork:notice] AH00171: Graceful restart requested, doing restart
+***.***.***.*** - - [18/Jul/2026:05:29:23 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 500
+***.***.***.*** - - [18/Jul/2026:05:29:25 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 500
+***.***.***.*** - - [18/Jul/2026:05:29:26 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 500
+
+[Sat Jul 18 05:35:14.446396 2026] [mpm_prefork:notice] AH00171: Graceful restart requested, doing restart
+***.***.***.*** - - [18/Jul/2026:05:35:21 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 200
+
+[Sat Jul 18 05:39:52.018805 2026] [mpm_prefork:notice] AH00170: caught SIGWINCH, shutting down gracefully
+[Sat Jul 18 05:40:57.241024 2026] [mpm_prefork:notice] [pid 1048] AH00163: Apache/2.4.58 (Ubuntu) OpenSSL/3.0.13 configured -- resuming normal operations
+
+[Sat Jul 18 05:54:16.748060 2026] [cgid:error] (2)No such file or directory: AH01241: exec of '/var/www/html/cgi-bin/bbs.cgi' failed
+***.***.***.*** - - [18/Jul/2026:05:54:16 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 500
+***.***.***.*** - - [18/Jul/2026:05:55:17 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 200
+***.***.***.*** - - [18/Jul/2026:05:59:31 +0000] "POST /cgi-bin/bbs.cgi HTTP/1.1" 200
+***.***.***.*** - - [18/Jul/2026:06:01:04 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 200
+***.***.***.*** - - [18/Jul/2026:06:13:29 +0000] "GET /cgi-bin/bbs.cgi HTTP/1.1" 200
+```
+
+※`/cgi-bin/../../bin/sh`等のシバン悪用スキャン（`AH10244`）、
+および`xmlrpc.php`スキャンは、本セッションと無関係な外部からの
+攻撃・調査トラフィックのため除外した。
+
+### Appendix B：変更した設定・ファイル（realfight.txtに基づく）
+
+- Apache：mod_cgid有効化／CGI設定有効化／ScriptAlias
+  （`/var/www/html/cgi-bin/`）／ExecCGI許可
+- bbs.cgi：シバン `#!/usr/local/bin/perl` → `#!/usr/bin/perl`、
+  改行コードCRLF→LF
+- パーミッション：cgi-bin・countディレクトリを777に変更
+- count：新規ディレクトリ作成
+
+### Appendix C：参考URL
+
+外部参考URLの提示は無し（情報源は access_log.zip の実ログおよび
+基さん自身の作業記録 realfight.txt のみ）。
