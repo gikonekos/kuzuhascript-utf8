@@ -1,0 +1,30 @@
+Σ:D「では、今回実際に行った対策だけを時系列でまとめます。」
+
+Apache CGIモジュール (mod_cgid) を有効化
+Apache の CGI 設定を有効化
+ScriptAlias を /var/www/html/cgi-bin/ に設定
+cgi-bin ディレクトリに ExecCGI を許可
+bbs.cgi のシバンを #!/usr/local/bin/perl → #!/usr/bin/perl に修正
+シバン行のCRLF（Windows改行）をLF（Unix改行）へ変換
+Apache を再読み込み・再起動
+bbs.cgi がコマンドラインで正常動作することを確認
+www-data ユーザーでも正常動作することを確認
+Apache経由で500エラーとなる原因を切り分け
+cgi-bin ディレクトリの書き込み権限を変更（777）し、CGIの動作を確認
+count ディレクトリを作成し、書き込み権限を設定（777）
+参加者カウント・カウンタ機能が正常動作することを確認
+掲示板トップページが正常表示されることを確認
+原因として判明したもの
+#!/usr/bin/perl のシバン行に CR (\r) が残っていたため、Apache が CGI を実行できなかった。
+cgi-bin および count への書き込み権限不足により、初期データの生成・更新が失敗していた。
+動態保存の観点
+CGI本体のロジックは変更しない。
+サーバー環境を整備して、オリジナルのCGIがそのまま動作する状態を再現する。
+
+※ 調査中に追加した
+
+use Cwd 'abs_path';
+use File::Basename;
+chdir dirname(abs_path($0));
+
+は原因切り分け用の実験であり、動態保存の最終形としては採用せず、サーバー設定側で解決する方向を目指す、という位置付けです。
