@@ -69,6 +69,10 @@ sub getmultipart {
 	
 	my ( @formbuf, $bound, $fname, $fnum, $ctype );
 	
+	# [2026-08-04] 脆弱性対策: getformdata同様にHTTP_HOSTチェックを追加
+	&prterror ( '呼び出し元が不正です。' )
+	  if ( $ENV{'HTTP_HOST'} && ! ( $ENV{'HTTP_HOST'} =~ /$bbshost/i ) );
+	
 	binmode ( STDIN ) if $ostype;
 	@formbuf = <STDIN>;
 	$formbuf[0] =~ /^(.+)\r\n/;
@@ -139,7 +143,8 @@ sub putupfile {
 	
 	for ( $current = 0 ; $UP_fname[$current] ; $current++ ) {
 		
-		open ( ULOG, "+<$uplogfilename" ) || &prterror ( 'アップロードログファイルを開けませんでした。' );
+		# [2026-08-04] 脆弱性対策: 2引数open → 3引数open
+		open ( ULOG, '+<', "$uplogfilename" ) || &prterror ( 'アップロードログファイルを開けませんでした。' );
 		eval 'flock ( ULOG, 2 )';
 		seek ( ULOG, 0, 0 );
 		@uplog = <ULOG>;
@@ -171,7 +176,8 @@ sub putupfile {
 		}
 		unshift ( @uplog, $nlog );
 		
-		$oldstream = select ( FLOG );
+		# [2026-08-04] バグ修正: select対象がFLOG（未オープン）だったのをULOGに修正
+		$oldstream = select ( ULOG );
 		$| = 1;
 		seek ( ULOG, 0, 0 );
 		truncate ( ULOG, 0 );
@@ -182,7 +188,8 @@ sub putupfile {
 		
 		$FORM{"fileurl$current"} =~ s/\r\n$//;
 		
-		open ( FILE, ">$upfiledir$upfile" ) || &prterror ( 'ファイルを作成できませんでした。' );
+		# [2026-08-04] 脆弱性対策: 2引数open → 3引数open
+		open ( FILE, '>', "$upfiledir$upfile" ) || &prterror ( 'ファイルを作成できませんでした。' );
 		binmode ( FILE ) if $ostype;
 		print FILE $FORM{"fileurl$current"};
 		close FILE;
@@ -204,8 +211,7 @@ sub prtupform {
 	my $dlink = $_[2];
 	my ( $bbslink, $gzipchk, $counter, $mbrcount );
 	
-	my $ptext = &pcode;
-	
+	# [2026-08-04] バグ修正: my $ptext = &pcode の重複宣言を1回に統合
 	# プロテクトコード生成
 	my $ptext = &pcode;
 	
