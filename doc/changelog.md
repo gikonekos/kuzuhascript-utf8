@@ -158,3 +158,58 @@ file -i: 全ファイル charset=utf-8 を維持
 - multipart/form-data経由のアップローダー機能（bbsup.pl）の実機動作確認
 - 過去ログ検索・キーワード検索など、より広範なモードの網羅的テスト
 - より広範な脆弱性監査（admin機能側の権限チェック等、未着手の範囲）
+
+---
+
+## 2026-08-04T00:00 Stage 3: kscrr1p9up バグ修正・脆弱性対策（bbsup.pl）
+
+対象: `kscrr1p9up/`（+アップローダーPlugin）のみ
+
+**[バグ修正・致命的] `putupfile()`: `select(FLOG)` → `select(ULOG)`**
+- `putupfile()` 内でアップロードログ書き込み前にバッファリング制御のため
+  `select()` するハンドルが `FLOG`（bbs.cgi の `putmessage()` で開かれる
+  投稿ログ用ハンドル）になっていた
+- `putupfile()` は `putmessage()` より先に呼ばれるため、この時点で `FLOG`
+  は未オープン。`select(FLOG)` が無効なハンドルを選択し、アップロードログ
+  への書き込みが不定動作になっていた
+- 対策: `select ( ULOG )` に修正
+
+**[バグ修正] `prtupform()`: `my $ptext = &pcode` の重複宣言を除去**
+- `prtupform()` の冒頭で `my $ptext = &pcode;` が2行連続して記述されており、
+  1行目の呼び出し結果が即座に捨てられていた
+- Perl 5.18以降では同一スコープ内での `my` 変数の再宣言として警告が発生する
+- 対策: 1行目を削除し、コメントを正位置に移動して1回の呼び出しに統合
+
+**[脆弱性対策] `getmultipart()`: HTTP_HOST チェックを追加**
+- `getformdata()` では `$bbshost` に対する `HTTP_HOST` 検証（呼び出し元
+  ホストの正当性確認）を行っているが、multipart/form-data リクエスト時に
+  呼ばれる `getmultipart()` には同等のチェックが存在しなかった
+- アップローダー利用時（ファイル添付投稿）にのみ有効なチェックが完全に
+  スキップされる設計上の欠落であり、外部ホストからのリクエストを拒否できない
+  状態だった
+- 対策: `getformdata()` と同一のガード（`$ENV{'HTTP_HOST'} =~ /$bbshost/i`）
+  を `getmultipart()` の先頭に追加
+
+**[脆弱性対策] `putupfile()`: `open(ULOG, ...)` 2引数 → 3引数化**
+- アップロードログファイルのオープン時に2引数形式の `open()` を使用していた
+- Perlの2引数 `open()` はファイル名にパイプ文字等を含む場合にコマンドと
+  して実行される危険性がある
+- 対策: `open ( ULOG, '+<', "$uplogfilename" )` の3引数形式に変更
+  （Stage 2 脆弱性対策の適用範囲を bbsup.pl に拡大）
+
+**[脆弱性対策] `putupfile()`: `open(FILE, ...)` 2引数 → 3引数化**
+- アップロードファイル書き出し時の `open()` も同様に2引数形式だった
+- 対策: `open ( FILE, '>', "$upfiledir$upfile" )` の3引数形式に変更
+
+perl -c シンタックスチェック: bbsup.pl OK（perl 5.38.2）
+
+**実機動作確認:**
+- Oracle VPS + Apache2 環境にてデプロイ、板表示・パスワード設定・メイン画面
+  表示まで正常動作を確認（2026-08-04）
+- アップロード機能（multipart投稿）の実機動作確認は次段階へ持ち越し
+
+**未着手・次段階へ持ち越し:**
+- 実行時の文字コード正規化処理の再実装（jconv代替）
+- bbslog.pl「jcode.pl使用」チェックボックスの扱い
+- multipart/form-data経由のアップローダー機能の実機動作確認
+- より広範な脆弱性監査（admin機能側の権限チェック等）
