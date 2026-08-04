@@ -213,3 +213,46 @@ perl -c シンタックスチェック: bbsup.pl OK（perl 5.38.2）
 - bbslog.pl「jcode.pl使用」チェックボックスの扱い
 - multipart/form-data経由のアップローダー機能の実機動作確認
 - より広範な脆弱性監査（admin機能側の権限チェック等）
+
+---
+
+## 2026-08-04T09:30 Stage 3続き: kscrr1p9up 実機デプロイ・動作確認
+
+対象: `kscrr1p9up/` Oracle VPS + Apache2 (Ubuntu) 実機
+
+**デプロイ時に判明した設置上の問題と対処:**
+
+- パーミッション不足（Permission denied）による500エラー
+  - bbs.cgi: `chmod 755`、sub/*.pl: `chmod 644` で解消
+  - count/count{0,1}.dat 未作成 → `echo "0" >` で作成、`chmod 666`
+  - bbs.log, bbs.upd: `chmod 666`
+  - log/, count/: `chmod 777`
+
+- `frame.upd`・`upload/` ディレクトリ未作成
+  - 初期設定 `$uplogfilename = './frame.upd'` に合わせ `touch frame.upd && chmod 666`
+  - `mkdir upload && chmod 777` で作成
+
+- `require 'sub/bbsadmin.pl'`（`./` なし）による管理モード500エラー
+  - Apache経由実行時はカレントディレクトリがスクリプトの場所にならないため
+    `./` なしの相対パスが @INC で解決できなかった
+  - `sed` で `require './sub/bbsadmin.pl'` に修正
+  - ※他の require は全て `./` 付きで問題なし、この1箇所のみ漏れていた
+
+- `$upfileurl` がオリジナルの `http://strange.kurumi.ne.jp/frame/upload/` のまま
+  - 実際のURLに合わせ `https://gikonekos.com/upload/k/` に変更
+
+- `upload/` を `cgi-bin/` 配下に置いたためApacheがPNGをCGIとして実行しようとした
+  - `cgi-bin/` 配下のファイルは拡張子に関わらず実行が試みられるApacheの仕様
+  - `upload/` を `/var/www/html/upload/k/` に移動
+  - `$upfiledir = '/var/www/html/upload/k/'`（絶対パス）に変更
+  - `$upfileurl = 'https://gikonekos.com/upload/k/'` に変更
+
+**動作確認結果:**
+- 板表示・通常投稿・管理モード・ファイル添付投稿・アップロードリンク表示
+  すべて正常動作を確認（2026-08-04）
+- アップロードファイルは `/var/www/html/upload/k/` に連番（0001.png等）で保存、
+  投稿本文にリンクとして正しく表示されることを確認
+
+**リポジトリへの反映が必要な修正（本番サーバーのみに適用済み）:**
+- `require './sub/bbsadmin.pl'`（`./` 補完）
+- `$upfiledir`・`$upfileurl` はサイト固有値のためプレースホルダー化を検討
