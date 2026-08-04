@@ -292,3 +292,32 @@ perl -c シンタックスチェック: bbsup.pl OK（perl 5.38.2）
   `$FORM{$fname} =~ s/"/&quot;/g;` を追加
 
 perl -c シンタックスチェック: 全対象ファイルOK（perl 5.38.2）
+
+---
+
+## 2026-08-04T13:00 Stage 4修正: javascript全角化処理をEncode対応版に修正
+
+対象: `kscrr1p9/bbs.cgi`, `kscrr1p9up/bbs.cgi`, `kscrr1p9up/sub/bbsup.pl`
+
+**[バグ修正] Stage 4の全角化処理が文字化けを引き起こす問題を修正**
+- Stage 4で実装した `chr(ord($1) + 0xFEE0)` による全角化処理が、
+  `use utf8` のない環境ではUTF-8文字列をバイト列として扱うため、
+  `javascript:` を含まない投稿者名・本文等も文字化けする問題が発生した
+- 対策: `Encode::decode` でUTF-8バイト列を内部文字列に変換してから
+  全角化処理を行い、`Encode::encode` で再度UTF-8バイト列に戻す方式に変更
+
+```perl
+use Encode;
+foreach my $key ( keys %FORM ) {
+    if ( $FORM{$key} =~ /javascript\s*:/i ) {
+        my $decoded = Encode::decode("UTF-8", $FORM{$key});
+        $decoded =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
+        $FORM{$key} = Encode::encode("UTF-8", $decoded);
+    }
+}
+```
+
+- 実機動作確認: `javascript:alert('XSS脆弱性あり')` を投稿→全角化・無害化を確認
+  通常の日本語投稿に文字化けが発生しないことを確認（2026-08-04）
+
+perl -c シンタックスチェック: 全対象ファイルOK（perl 5.38.2）
