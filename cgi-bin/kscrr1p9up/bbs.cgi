@@ -280,6 +280,10 @@ sub getformdata {
 			( $name, $value ) = split ( /=/ );
 			$value =~ s/\+/ /g;
 			$value =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack ( "C", hex ( $1 ) )/eg;
+			# [2026-08-04修正] javascript: 無害化（エスケープ前・数値文字参照方式・Encode不要）
+			if ( $value =~ /javascript\s*:/i ) {
+				$value =~ s/([!-~])/sprintf("&#%d;", ord($1))/ge;
+			}
 			$value =~ s/&/&amp;/g;
 			$value =~ s/</&lt;/g;
 			$value =~ s/>/&gt;/g;
@@ -291,15 +295,6 @@ sub getformdata {
 			$value =~ s/\r$//;
 			$value =~ s/\,/\0/g;
 			$FORM{$name} = $value;
-		}
-	}
-	# [2026-08-04] 脆弱性対策: javascript: スキームを含む項目を全角化して無害化
-	use Encode;
-	foreach my $key ( keys %FORM ) {
-		if ( $FORM{$key} =~ /javascript\s*:/i ) {
-			my $decoded = Encode::decode("UTF-8", $FORM{$key});
-			$decoded =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
-			$FORM{$key} = Encode::encode("UTF-8", $decoded);
 		}
 	}
 }

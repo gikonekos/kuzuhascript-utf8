@@ -321,3 +321,29 @@ foreach my $key ( keys %FORM ) {
   通常の日本語投稿に文字化けが発生しないことを確認（2026-08-04）
 
 perl -c シンタックスチェック: 全対象ファイルOK（perl 5.38.2）
+
+## 2026-08-04T15:00 Stage 4修正2: javascript:無害化をEncode不要方式に変更
+
+対象: `kscrr1p9/bbs.cgi`, `kscrr1p9up/bbs.cgi`, `kscrr1p9up/sub/bbsup.pl`
+
+**[バグ修正] Stage 4の全角化処理にHTMLエスケープ破壊の問題があったため方式変更**
+
+- Stage 4修正（2026-08-04T13:00）で導入したEncode::decode/encode方式を廃止し、
+  数値文字参照（`&#nnn;`）方式に変更
+
+- **問題点:** `use Encode` を用いた全角化をgetformdata()ループ後に行うと、
+  `&amp;` の `;` 等もs/([!-~])/にマッチし「＆ａｍｐ；」に化けてHTMLが壊れる。
+  またCP932環境では `chr(ord+0xFEE0)` が文字化けを引き起こす。
+
+- **変更内容:**
+  - `use Encode` ブロック（ループ後の foreach）を3ファイルとも削除
+  - javascript:の検出・変換をURLデコード直後・`&amp;`変換前（ループ内）に移動
+  - 変換方式を `chr(ord($1)+0xFEE0)` → `sprintf("&#%d;", ord($1))` に変更
+    - `&#nnn;` はCP932ページでもブラウザが正しく解釈する
+    - Encodeモジュール不要、バイト操作のみで完結
+    - `&amp;` 等のエスケープ済み文字列に影響しない（変換前に処理するため）
+
+- **bbsup.pl の挿入位置:** `getmultipart()` はmultipartのため構造が異なる。
+  `$FORM{$fname} =~ s/&/&amp;/g` の直前（=エスケープ処理の前）に挿入。
+
+perl -c シンタックスチェック: 全対象ファイルOK（perl 5.38.2）

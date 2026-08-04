@@ -83,6 +83,10 @@ sub getmultipart {
 	while ( $formbuf[$i] ) {
 		if ( $formbuf[$i] =~ /$bound/ ) {
 			if ( $fname && ! ( $fname =~ /fileurl/ ) ) {
+				# [2026-08-04修正] javascript: 無害化（エスケープ前・数値文字参照方式・Encode不要）
+				if ( $FORM{$fname} =~ /javascript\s*:/i ) {
+					$FORM{$fname} =~ s/([!-~])/sprintf("&#%d;", ord($1))/ge;
+				}
 				$FORM{$fname} =~ s/&/&amp;/g;
 				$FORM{$fname} =~ s/</&lt;/g;
 				$FORM{$fname} =~ s/>/&gt;/g;
@@ -126,15 +130,6 @@ sub getmultipart {
 			$FORM{$fname} .= $formbuf[$i];
 		}
 		$i++;
-	}
-	# [2026-08-04] 脆弱性対策: javascript: スキームを含む項目を全角化して無害化
-	use Encode;
-	foreach my $key ( keys %FORM ) {
-		if ( $FORM{$key} =~ /javascript\s*:/i ) {
-			my $decoded = Encode::decode("UTF-8", $FORM{$key});
-			$decoded =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
-			$FORM{$key} = Encode::encode("UTF-8", $decoded);
-		}
 	}
 }
 
