@@ -293,6 +293,12 @@ sub getformdata {
 			$FORM{$name} = $value;
 		}
 	}
+	# [2026-08-04] 脆弱性対策: javascript: スキームを含む項目を全角化して無害化
+	foreach my $key ( keys %FORM ) {
+		if ( $FORM{$key} =~ /javascript\s*:/i ) {
+			$FORM{$key} =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
+		}
+	}
 }
 
 
