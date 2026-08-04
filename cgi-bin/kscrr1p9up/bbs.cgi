@@ -889,7 +889,7 @@ sub chkmessage {
 	} else {
 		if ( &chkpasswd ) {
 			if ( $FORM{'v'} =~ /^$adminkey/ ) {
-				require 'sub/bbsadmin.pl';
+				require './sub/bbsadmin.pl';
 				&adminmain;
 				exit;
 			} else {
