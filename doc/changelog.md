@@ -256,3 +256,39 @@ perl -c シンタックスチェック: bbsup.pl OK（perl 5.38.2）
 **リポジトリへの反映が必要な修正（本番サーバーのみに適用済み）:**
 - `require './sub/bbsadmin.pl'`（`./` 補完）
 - `$upfiledir`・`$upfileurl` はサイト固有値のためプレースホルダー化を検討
+
+---
+
+## 2026-08-04T10:00 Stage 4: 脆弱性対策（javascript:スキーム無害化・&quot;エスケープ補完）
+
+対象: `kscrr1p9/bbs.cgi`, `kscrr1p9up/bbs.cgi`, `kscrr1p9up/sub/bbsup.pl`
+
+**[脆弱性対策] `javascript:` スキームの全角化による無害化**
+- URL欄（`$FORM{'l'}`）に `javascript:alert(1)` 等を入力すると、
+  `chkmessage()` 内でそのままAタグのhref属性に展開され、クリックした
+  閲覧者のブラウザ上で任意のJavaScriptが実行されるXSSが成立していた
+- URL欄以外の項目（投稿者名・メール・題名・本文等）でも同様の経路が
+  理論上存在するため、全フォーム項目を対象に対処
+- 方針: URLを弾く（実用上不便）のではなく、`javascript:` を含む項目全体の
+  ASCII印字可能文字（0x21〜0x7E）を対応する全角文字（U+FF01〜U+FF5E）に
+  変換して無害化する
+- 実装: `getformdata()`・`getmultipart()` の末尾に以下を追加
+  ```perl
+  foreach my $key ( keys %FORM ) {
+      if ( $FORM{$key} =~ /javascript\s*:/i ) {
+          $FORM{$key} =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
+      }
+  }
+  ```
+- `getformdata()` は `kscrr1p9/bbs.cgi`・`kscrr1p9up/bbs.cgi` の両方に適用
+- `getmultipart()` は `kscrr1p9up/sub/bbsup.pl` に適用
+
+**[脆弱性対策] `getmultipart()`: `&quot;` エスケープの欠落を補完**
+- `getformdata()` では `$value =~ s/"/&quot;/g` によるダブルクォートの
+  エスケープが実施されていたが、multipart/form-data経由の `getmultipart()`
+  では同処理が欠落していた（Stage 2で `getformdata()` に追加済みだったが
+  `getmultipart()` への適用が漏れていた）
+- `kscrr1p9up/sub/bbsup.pl` の `getmultipart()` 内エスケープ処理に
+  `$FORM{$fname} =~ s/"/&quot;/g;` を追加
+
+perl -c シンタックスチェック: 全対象ファイルOK（perl 5.38.2）
