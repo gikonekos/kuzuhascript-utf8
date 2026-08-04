@@ -86,6 +86,7 @@ sub getmultipart {
 				$FORM{$fname} =~ s/&/&amp;/g;
 				$FORM{$fname} =~ s/</&lt;/g;
 				$FORM{$fname} =~ s/>/&gt;/g;
+				$FORM{$fname} =~ s/"/&quot;/g;
 				$FORM{$fname} =~ s/\r\n/\r/g;
 				$FORM{$fname} =~ s/\n/\r/g;
 				$FORM{$fname} =~ s/\r$//;
@@ -125,6 +126,12 @@ sub getmultipart {
 			$FORM{$fname} .= $formbuf[$i];
 		}
 		$i++;
+	}
+	# [2026-08-04] 脆弱性対策: javascript: スキームを含む項目を全角化して無害化
+	foreach my $key ( keys %FORM ) {
+		if ( $FORM{$key} =~ /javascript\s*:/i ) {
+			$FORM{$key} =~ s/([!-~])/chr(ord($1) + 0xFEE0)/ge;
+		}
 	}
 }
 
