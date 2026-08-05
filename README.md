@@ -15,6 +15,13 @@ Setup guide: see [doc/install.md](./doc/install.md).
 **Before deploying anything from this repository, please read
 [SECURITY.md](./SECURITY.md).**
 
+### Related
+
+- Historical original: [kuzuhascript-archive](https://github.com/gikonekos/kuzuhascript-archive)
+- BBS log preprocessing: [legacy-bbs-toolkit](https://github.com/gikonekos/legacy-bbs-toolkit)
+- Maintainer: [github.com/gikonekos](https://github.com/gikonekos)
+
+
 ### Requirements
 
 - Perl 5.38+ (tested on 5.38.2). Likely fine on most Perl 5.x, but untested
